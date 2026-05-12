@@ -1,0 +1,201 @@
+# Personal Trading OS MVP
+# File: config\rules.yaml
+# Purpose: 시장 모드별 행동 규칙, 금지 행동, 리스크 경고 정의
+
+global_do_not_do:
+  - id: no_opening_chase
+    text: 장초반 첫 5~15분 갭상승 종목 무근거 추격 금지
+    severity: high
+
+  - id: no_d_grade_averaging_down
+    text: D급 종목 물타기 금지
+    severity: high
+
+  - id: no_entry_without_stop
+    text: 손절가 없는 진입 금지
+    severity: high
+
+  - id: no_high_beta_size_up_when_vix_rising
+    text: VIX 상승 중 고베타 종목 포지션 확대 금지
+    severity: high
+
+  - id: no_over_sizing_around_events
+    text: CPI/FOMC/대형 실적 전후 과대 진입 금지
+    severity: high
+
+  - id: no_aggressive_new_trade_in_caution_defensive
+    text: 시장 모드 Caution/Defensive에서 신규 공격 매매 금지
+    severity: high
+
+  - id: no_news_only_entry
+    text: 뉴스 하나만 보고 차트·섹터 확인 없이 진입 금지
+    severity: medium
+
+  - id: no_revenge_trade
+    text: 손실 직후 복구 목적의 즉흥 진입 금지
+    severity: high
+
+  - id: no_thesis_change_after_loss
+    text: 단기 매매 실패 후 장기투자로 명분 변경 금지
+    severity: high
+
+risk_modes:
+  Risk-On:
+    key: risk_on
+    position_multiplier: 1.0
+    allowed_behavior:
+      - A급과 B급 중심으로 셋업 확인
+      - Breakout과 Pullback 모두 관찰 가능
+      - 이벤트 리스크가 없을 때만 정상 사이즈 검토
+    restrictions:
+      - 장초반 무근거 추격 금지
+      - 고베타 종목은 손절 기준 선명할 때만 진입 검토
+      - 어닝 7일 이내 종목은 사이즈 축소
+
+  Mild Risk-On:
+    key: mild_risk_on
+    position_multiplier: 0.8
+    allowed_behavior:
+      - A급 우선 관찰
+      - B급은 가격 행동 확인 후 관찰
+      - Pullback 셋업 우선
+    restrictions:
+      - Breakout 추격 진입 주의
+      - 이벤트 전후 신규 진입 축소
+      - D급 종목 반등 예측 금지
+
+  Neutral:
+    key: neutral
+    position_multiplier: 0.6
+    allowed_behavior:
+      - A급만 우선 관찰
+      - B급은 대기 또는 소액 관찰
+      - 시장 방향 확인 전까지 보수적 대응
+    restrictions:
+      - 고베타 신규 진입 축소
+      - 추세 불명확 종목 매매 금지
+      - 지수 방향 불일치 시 관망 우선
+
+  Caution:
+    key: caution
+    position_multiplier: 0.4
+    allowed_behavior:
+      - 관찰 중심
+      - 기존 포지션 리스크 점검
+      - A급 중 이벤트 리스크 낮은 종목만 제한적 관찰
+    restrictions:
+      - 신규 공격 매매 금지
+      - 장초반 추격 금지
+      - D급 물타기 금지
+      - 고베타 사이즈 확대 금지
+      - 이벤트 전후 과대 진입 금지
+
+  Defensive:
+    key: defensive
+    position_multiplier: 0.2
+    allowed_behavior:
+      - No-trade 또는 Observation Bias 우선
+      - 현금 비중과 손실 제한 우선
+      - 시장 안정 신호 확인 전까지 관망
+    restrictions:
+      - 신규 공격 매매 금지
+      - 고베타 신규 진입 금지
+      - D급 종목 물타기 금지
+      - 반등 예측 매매 금지
+      - 레버리지성 사고 금지
+
+event_overlay_rules:
+  high_impact_macro_today:
+    overlay: Caution
+    warning: 고영향 매크로 이벤트 당일. 첫 반응 추격 금지.
+    position_multiplier_cap: 0.5
+
+  high_impact_macro_next_24h:
+    overlay: Caution
+    warning: 24시간 내 고영향 매크로 이벤트. 신규 진입 사이즈 축소.
+    position_multiplier_cap: 0.6
+
+  fomc_today:
+    overlay: Caution
+    warning: FOMC 당일. 발표 전후 방향성 확인 전 진입 금지.
+    position_multiplier_cap: 0.4
+
+  fomc_minutes_today:
+    overlay: Caution
+    warning: FOMC Minutes 공개일. 변동성 확대 가능성 주의.
+    position_multiplier_cap: 0.5
+
+  earnings_today:
+    overlay: Ticker-Specific Caution
+    warning: 어닝 당일 종목. 신규 스윙 진입 금지 또는 강한 제한.
+    position_multiplier_cap: 0.3
+
+  earnings_tomorrow:
+    overlay: Ticker-Specific Caution
+    warning: 어닝 하루 전 종목. 과대 진입 금지.
+    position_multiplier_cap: 0.4
+
+  earnings_within_7d:
+    overlay: Ticker-Specific Caution
+    warning: 어닝 7일 이내. 변동성 확대 가능성 표시.
+    position_multiplier_cap: 0.6
+
+vix_rules:
+  vix_up_5pct_or_more:
+    warning: VIX가 전일 대비 5% 이상 상승. 고베타 포지션 확대 금지.
+    action: reduce_high_beta_exposure
+
+  vix_above_20dma:
+    warning: VIX가 20일선 위. 리스크 모드 보수적으로 해석.
+    action: apply_caution_bias
+
+  vix_spike_with_qqq_weakness:
+    warning: VIX 상승과 QQQ 약세 동시 발생. No-trade Bias 검토.
+    action: consider_no_trade_bias
+
+no_trade_flags:
+  trigger_if_multiple_true: 2
+  conditions:
+    - defensive_mode
+    - caution_mode_with_high_impact_event
+    - vix_spike
+    - qqq_spy_direction_conflict
+    - smh_underperforms_qqq
+    - majority_watchlist_c_or_d
+    - d_grade_names_leading_intraday
+    - high_impact_macro_today
+
+ticker_specific_risk_rules:
+  d_grade:
+    warning: D급 종목은 회피/주의 대상. 물타기 금지.
+    forbidden_actions:
+      - averaging_down
+      - rebound_prediction
+      - oversized_entry
+
+  high_beta:
+    warning: 고베타 종목은 시장 모드와 VIX 상태를 우선 확인.
+    forbidden_when:
+      - Defensive
+      - Caution
+      - vix_spike
+      - high_impact_macro_today
+
+  speculative:
+    warning: 투기성 종목은 이벤트와 유동성 리스크를 별도 확인.
+    forbidden_when:
+      - Defensive
+      - high_impact_macro_today
+      - earnings_today
+
+daily_checklist:
+  before_trade:
+    - 시장 모드가 Risk-On 또는 Mild Risk-On인지 확인
+    - Event Overlay가 Caution인지 확인
+    - 해당 종목 등급이 A/B/C/D 중 무엇인지 확인
+    - 셋업이 Breakout/Pullback/Avoid 중 어디에 속하는지 확인
+    - 어닝 7일 이내인지 확인
+    - VIX가 상승 중인지 확인
+    - SAVE/TradingView 뉴스 확인
+    - 손절가와 무효화 조건 작성
+    - 장초반 추격이 아닌지 확인

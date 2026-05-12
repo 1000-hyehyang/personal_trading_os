@@ -1,0 +1,302 @@
+# Personal Trading OS MVP
+# File: config\watchlist.yaml
+# Purpose: 시장 핵심 지표, 섹터 ETF, 관심종목 정의
+
+market_core:
+  - SPY
+  - QQQ
+  - IWM
+  - DIA
+
+volatility:
+  - ^VIX
+
+rates_credit:
+  - TLT
+  - HYG
+  - UUP
+  - ^TNX
+
+sectors:
+  broad_technology:
+    - XLK
+    - XLC
+    - XLY
+
+  semiconductors:
+    - SMH
+    - SOXX
+
+  defensive:
+    - XLV
+    - XLP
+    - XLU
+
+  cyclicals:
+    - XLF
+    - XLI
+    - XLE
+    - XLB
+    - XLRE
+
+watchlist:
+  mega_cap_tech:
+    - MSFT
+    - AAPL
+    - AMZN
+    - META
+    - GOOGL
+    - NFLX
+    - TSLA
+
+  semiconductors:
+    - NVDA
+    - AMD
+    - AVGO
+    - MU
+    - INTC
+    - QCOM
+    - ARM
+    - TSM
+    - ASML
+    - LRCX
+    - AMAT
+    - KLAC
+    - MRVL
+    - ON
+    - MCHP
+    - WDC
+    - SNDK
+
+  high_beta_growth:
+    - PLTR
+    - COIN
+    - SNOW
+    - CRWD
+    - NET
+    - DDOG
+    - MDB
+    - RBLX
+    - SHOP
+    - UBER
+
+  space_and_speculative:
+    - RKLB
+    - ASTS
+
+ticker_metadata:
+  MSFT:
+    sector: technology
+    theme: mega_cap_ai_cloud
+    beta_group: large_cap
+    priority: core
+
+  AAPL:
+    sector: technology
+    theme: mega_cap_consumer_hardware
+    beta_group: large_cap
+    priority: core
+
+  AMZN:
+    sector: consumer_discretionary
+    theme: cloud_ecommerce_ai
+    beta_group: large_cap
+    priority: core
+
+  META:
+    sector: communication_services
+    theme: ai_ads_metaverse
+    beta_group: large_cap
+    priority: core
+
+  GOOGL:
+    sector: communication_services
+    theme: search_cloud_ai
+    beta_group: large_cap
+    priority: core
+
+  NFLX:
+    sector: communication_services
+    theme: streaming_media
+    beta_group: large_cap
+    priority: secondary
+
+  TSLA:
+    sector: consumer_discretionary
+    theme: ev_ai_robotics
+    beta_group: high_beta
+    priority: secondary
+
+  NVDA:
+    sector: semiconductors
+    theme: ai_accelerators
+    beta_group: high_beta
+    priority: core
+
+  AMD:
+    sector: semiconductors
+    theme: ai_cpu_gpu
+    beta_group: high_beta
+    priority: core
+
+  AVGO:
+    sector: semiconductors
+    theme: ai_networking_custom_silicon
+    beta_group: large_cap
+    priority: core
+
+  MU:
+    sector: semiconductors
+    theme: memory_hbm
+    beta_group: high_beta
+    priority: secondary
+
+  INTC:
+    sector: semiconductors
+    theme: cpu_foundry_turnaround
+    beta_group: high_beta
+    priority: watch
+
+  QCOM:
+    sector: semiconductors
+    theme: mobile_edge_ai
+    beta_group: large_cap
+    priority: secondary
+
+  ARM:
+    sector: semiconductors
+    theme: ip_architecture_ai_edge
+    beta_group: high_beta
+    priority: secondary
+
+  TSM:
+    sector: semiconductors
+    theme: foundry
+    beta_group: large_cap
+    priority: core
+
+  ASML:
+    sector: semiconductors
+    theme: lithography_equipment
+    beta_group: large_cap
+    priority: core
+
+  LRCX:
+    sector: semiconductors
+    theme: semiconductor_equipment
+    beta_group: large_cap
+    priority: secondary
+
+  AMAT:
+    sector: semiconductors
+    theme: semiconductor_equipment
+    beta_group: large_cap
+    priority: secondary
+
+  KLAC:
+    sector: semiconductors
+    theme: process_control_equipment
+    beta_group: large_cap
+    priority: secondary
+
+  MRVL:
+    sector: semiconductors
+    theme: ai_networking
+    beta_group: high_beta
+    priority: secondary
+
+  ON:
+    sector: semiconductors
+    theme: power_auto_semis
+    beta_group: high_beta
+    priority: watch
+
+  MCHP:
+    sector: semiconductors
+    theme: analog_microcontrollers
+    beta_group: mid_beta
+    priority: watch
+
+  WDC:
+    sector: technology_hardware
+    theme: storage_memory
+    beta_group: high_beta
+    priority: watch
+
+  SNDK:
+    sector: technology_hardware
+    theme: storage_memory
+    beta_group: high_beta
+    priority: watch
+
+  PLTR:
+    sector: software
+    theme: ai_analytics
+    beta_group: high_beta
+    priority: secondary
+
+  COIN:
+    sector: financials_crypto
+    theme: crypto_exchange
+    beta_group: high_beta
+    priority: watch
+
+  SNOW:
+    sector: software
+    theme: data_cloud_ai
+    beta_group: high_beta
+    priority: watch
+
+  CRWD:
+    sector: software
+    theme: cybersecurity
+    beta_group: high_beta
+    priority: secondary
+
+  NET:
+    sector: software
+    theme: edge_cloud_security
+    beta_group: high_beta
+    priority: watch
+
+  DDOG:
+    sector: software
+    theme: observability_cloud
+    beta_group: high_beta
+    priority: watch
+
+  MDB:
+    sector: software
+    theme: database_cloud
+    beta_group: high_beta
+    priority: watch
+
+  RBLX:
+    sector: communication_services
+    theme: gaming_metaverse
+    beta_group: high_beta
+    priority: watch
+
+  SHOP:
+    sector: software
+    theme: ecommerce_platform
+    beta_group: high_beta
+    priority: watch
+
+  UBER:
+    sector: technology_platform
+    theme: mobility_delivery
+    beta_group: high_beta
+    priority: secondary
+
+  RKLB:
+    sector: aerospace
+    theme: space_launch
+    beta_group: speculative
+    priority: watch
+
+  ASTS:
+    sector: telecom_space
+    theme: satellite_direct_to_device
+    beta_group: speculative
+    priority: watch

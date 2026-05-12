@@ -1,0 +1,160 @@
+# Personal Trading OS MVP
+# File: config\setups.yaml
+# Purpose: Breakout / Pullback / Avoid 셋업 규칙 정의
+
+setups:
+  breakout:
+    enabled: true
+    description: 전고점 또는 20일 고점 근처 돌파 후보
+    priority: high
+
+    required:
+      - close_above_20dma
+      - close_above_50dma
+      - near_20d_high
+      - volume_above_20d_avg
+
+    preferred:
+      - market_mode_not_defensive
+      - market_mode_not_caution
+      - sector_strong
+      - relative_strength_vs_spy_positive
+      - relative_strength_vs_qqq_positive
+      - no_high_impact_event_today
+      - no_earnings_today
+      - no_earnings_tomorrow
+
+    reject_if:
+      - close_below_50dma
+      - close_below_200dma
+      - market_mode_defensive
+      - vix_spike
+      - earnings_today
+      - high_impact_macro_today
+
+    output_label: Breakout 후보
+    risk_note: 돌파 후보라도 장초반 갭상승 무근거 추격은 금지
+
+  pullback:
+    enabled: true
+    description: 상승 추세 중 20일선 근처 눌림 후보
+    priority: medium
+
+    required:
+      - close_above_50dma
+      - price_near_20dma
+      - rsi_not_overheated
+
+    preferred:
+      - close_above_200dma
+      - sector_not_weak
+      - market_mode_not_defensive
+      - relative_strength_vs_spy_not_negative
+      - volume_decline_on_pullback
+      - no_earnings_today
+      - no_high_impact_event_today
+
+    reject_if:
+      - close_below_50dma
+      - close_below_200dma
+      - market_mode_defensive
+      - breakdown_with_high_volume
+      - earnings_today
+
+    output_label: Pullback 후보
+    risk_note: 눌림 후보는 추세 훼손 여부와 손절 기준을 먼저 확인
+
+  avoid:
+    enabled: true
+    description: 회피 또는 리스크 관리 대상
+    priority: risk_control
+
+    required_any:
+      - close_below_50dma
+      - close_below_200dma
+      - near_20d_low
+      - market_mode_defensive
+      - major_event_high_impact
+      - earnings_today
+      - earnings_tomorrow
+      - vix_spike
+      - relative_strength_vs_spy_negative
+      - relative_strength_vs_qqq_negative
+
+    severity_rules:
+      high:
+        - close_below_200dma
+        - earnings_today
+        - market_mode_defensive
+        - vix_spike
+        - high_impact_macro_today
+
+      medium:
+        - close_below_50dma
+        - earnings_within_7d
+        - sector_weak
+        - relative_strength_vs_qqq_negative
+
+      low:
+        - price_extended_from_20dma
+        - volume_below_20d_avg
+        - unclear_setup
+
+    output_label: Avoid 후보
+    risk_note: Avoid 종목은 반등 예측, 물타기, 장초반 추격 금지
+
+setup_scoring:
+  breakout:
+    base_score: 0
+    points:
+      close_above_20dma: 2
+      close_above_50dma: 2
+      near_20d_high: 1
+      volume_above_20d_avg: 1
+      sector_strong: 1
+      relative_strength_vs_qqq_positive: 1
+      market_mode_risk_on: 1
+    penalties:
+      earnings_within_7d: -1
+      vix_above_20dma: -1
+      high_impact_macro_next_24h: -1
+      market_mode_caution: -2
+      market_mode_defensive: -4
+
+  pullback:
+    base_score: 0
+    points:
+      close_above_50dma: 2
+      close_above_200dma: 1
+      price_near_20dma: 2
+      rsi_not_overheated: 1
+      sector_not_weak: 1
+      relative_strength_vs_spy_not_negative: 1
+    penalties:
+      close_below_20dma: -1
+      earnings_within_7d: -1
+      high_impact_macro_today: -2
+      market_mode_defensive: -4
+
+  avoid:
+    base_score: 0
+    points:
+      close_below_50dma: 2
+      close_below_200dma: 3
+      near_20d_low: 1
+      market_mode_defensive: 3
+      earnings_today: 3
+      earnings_tomorrow: 2
+      vix_spike: 2
+      major_event_high_impact: 2
+
+classification_thresholds:
+  breakout_min_score: 5
+  pullback_min_score: 4
+  avoid_min_score: 3
+
+notes:
+  - 셋업 분류는 매수/매도 추천이 아니다.
+  - Breakout 후보라도 장초반 추격 금지 원칙을 우선한다.
+  - Pullback 후보라도 50일선 훼손 시 Avoid로 이동할 수 있다.
+  - Avoid 후보는 물타기 금지와 반등 예측 금지 대상이다.

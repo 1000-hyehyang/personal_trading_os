@@ -1,0 +1,166 @@
+# Personal Trading OS MVP
+# File: config\settings.yaml
+# Purpose: 실행 기본값, 데이터 수집, 출력, Telegram 설정
+
+project:
+  name: Personal Trading OS MVP
+  root_path_windows: C:\trading\personal_trading_os
+  python_version: "3.12"
+  auto_trading_enabled: false
+  tradingview_scraping_enabled: false
+  llm_api_enabled: false
+  news_auto_collection_enabled: false
+
+session:
+  default: post_close
+  allowed:
+    - pre_market
+    - post_close
+  timezone_market: America/New_York
+  timezone_user: Asia/Seoul
+
+data:
+  provider: yfinance
+  lookback_period: 1y
+  interval: 1d
+  cache_enabled: true
+  cache_dir: cache
+  price_cache_file: cache\prices_cache.json
+
+indicators:
+  moving_averages:
+    short: 20
+    medium: 50
+    long: 200
+
+  volume:
+    average_window: 20
+    high_volume_threshold: 1.2
+    low_volume_threshold: 0.8
+
+  relative_strength:
+    benchmark_primary: SPY
+    benchmark_growth: QQQ
+    lookback_days: 5
+
+  high_low:
+    lookback_days: 20
+    near_high_threshold_pct: 3.0
+    near_low_threshold_pct: 3.0
+
+market_regime:
+  modes:
+    - Risk-On
+    - Mild Risk-On
+    - Neutral
+    - Caution
+    - Defensive
+
+  score_thresholds:
+    risk_on_min: 5
+    mild_risk_on_min: 2
+    neutral_min: -1
+    neutral_max: 1
+    caution_min: -4
+    caution_max: -2
+    defensive_max: -5
+
+  core_symbols:
+    spy: SPY
+    qqq: QQQ
+    iwm: IWM
+    dia: DIA
+    semiconductors: SMH
+    technology: XLK
+    volatility: ^VIX
+    credit: HYG
+    long_bonds: TLT
+    dollar: UUP
+    ten_year_yield: ^TNX
+
+events:
+  earnings_provider: alpha_vantage
+  economic_provider: fmp_bls_fed
+  manual_events_file: config\events_manual.yaml
+  events_auto_file: output\events_auto.json
+  events_merged_file: output\events_merged.json
+  lookahead_days: 30
+  earnings_risk_window_days: 7
+  high_impact_event_window_hours: 24
+  use_fmp_if_key_exists: true
+  use_bls_fallback: true
+  use_fed_fomc_fallback: true
+
+manual_news:
+  enabled: true
+  file: data\manual_news_notes.md
+  auto_summary_enabled: false
+  require_user_input: true
+
+ranking:
+  grades:
+    A:
+      min_score: 7
+      label: Priority Watch
+    B:
+      min_score: 4
+      max_score: 6
+      label: Secondary Watch
+    C:
+      min_score: 1
+      max_score: 3
+      label: Wait
+    D:
+      max_score: 0
+      label: Avoid / Risk
+
+  max_positive_reasons: 6
+  max_negative_reasons: 6
+
+setups:
+  enabled:
+    - breakout
+    - pullback
+    - avoid
+
+risk_engine:
+  no_trade_bias_enabled: true
+  high_beta_caution_enabled: true
+  d_grade_averaging_down_warning: true
+  opening_chase_warning: true
+  event_overtrade_warning: true
+
+output:
+  directory: output
+  daily_packet_md: output\daily_packet.md
+  daily_packet_json: output\daily_packet.json
+  prompt_for_gpt: output\prompt_for_gpt.txt
+  prompt_for_claude: output\prompt_for_claude.txt
+  telegram_summary: output\telegram_summary.txt
+  language: ko
+  max_priority_tickers: 7
+  max_risk_tickers: 7
+  include_data_quality_notes: true
+  include_manual_news_notes: true
+
+telegram:
+  enabled: true
+  send_summary: true
+  send_daily_packet: true
+  send_gpt_prompt: true
+  send_claude_prompt: true
+  parse_mode: plain_text
+  max_message_chars: 4000
+
+logging:
+  log_dir: logs
+  post_close_log: logs\post_close.log
+  pre_market_log: logs\pre_market.log
+  encoding: utf-8
+  level: INFO
+
+fallback:
+  allow_mock_when_api_missing: true
+  allow_run_without_fmp_key: true
+  allow_run_without_manual_news: true
+  fail_if_price_data_missing: false

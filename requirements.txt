@@ -1,0 +1,12 @@
+pandas
+numpy
+yfinance
+pyyaml
+python-dotenv
+requests
+python-dateutil
+pytz
+beautifulsoup4
+lxml
+rich
+pytest
