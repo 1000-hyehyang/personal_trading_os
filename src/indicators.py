@@ -276,12 +276,48 @@ def latest_indicator_snapshot(
     return result
 
 
+def _coerce_to_dataframe(value: Any, ticker: str) -> pd.DataFrame:
+    """
+    Accept either a pd.DataFrame or a list[dict] of OHLCV records.
+
+    fetch_prices.py returns dict[str, list[dict]] (records format).
+    indicators.py internally needs pd.DataFrame.
+    This adapter bridges the two formats.
+    """
+    if isinstance(value, pd.DataFrame):
+        return value
+
+    if isinstance(value, list) and value:
+        try:
+            df = pd.DataFrame(value)
+            for date_col in ("date", "Date", "datetime", "Datetime", "timestamp"):
+                if date_col in df.columns:
+                    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+                    df = df.set_index(date_col).sort_index()
+                    break
+            return df
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot convert list[dict] to DataFrame for {ticker}: {exc}"
+            ) from exc
+
+    if isinstance(value, list) and not value:
+        raise ValueError(f"Empty price list for {ticker}")
+
+    raise ValueError(
+        f"Unsupported price data type for {ticker}: {type(value).__name__}"
+    )
+
+
 def calculate_indicators_for_tickers(
-    price_data: dict[str, pd.DataFrame],
+    price_data: dict[str, Any],
     config: IndicatorConfig | None = None,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """
     Calculate latest indicator snapshot for multiple tickers.
+
+    Accepts both dict[str, pd.DataFrame] and dict[str, list[dict]] —
+    the latter is what fetch_prices.py returns.
 
     Returns:
         indicators_by_ticker, data_quality_notes
@@ -289,8 +325,9 @@ def calculate_indicators_for_tickers(
     indicators_by_ticker: dict[str, dict[str, Any]] = {}
     data_quality_notes: list[str] = []
 
-    for ticker, df in price_data.items():
+    for ticker, raw_value in price_data.items():
         try:
+            df = _coerce_to_dataframe(raw_value, ticker)
             indicators_by_ticker[ticker] = latest_indicator_snapshot(
                 df,
                 ticker=ticker,

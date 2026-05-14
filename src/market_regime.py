@@ -823,6 +823,7 @@ def _collect_event_flags(events: dict[str, Any]) -> set[str]:
 
 
 def _collect_today_events(events: dict[str, Any]) -> list[Any]:
+    today_str = date.today().isoformat()
     collected: list[Any] = []
 
     for key in [
@@ -835,7 +836,14 @@ def _collect_today_events(events: dict[str, Any]) -> list[Any]:
         value = events.get(key)
 
         if isinstance(value, list):
-            collected.extend(value)
+            for item in value:
+                # Defensive: skip items dated in the future even if they
+                # somehow ended up in an *_today bucket.
+                if isinstance(item, dict):
+                    item_date = str(item.get("date") or "")[:10]
+                    if item_date and item_date != today_str:
+                        continue
+                collected.append(item)
 
     # Some event calendar modules may use nested structures.
     event_risk = events.get("event_risk")
@@ -849,7 +857,12 @@ def _collect_today_events(events: dict[str, Any]) -> list[Any]:
         ]:
             value = event_risk.get(key)
             if isinstance(value, list):
-                collected.extend(value)
+                for item in value:
+                    if isinstance(item, dict):
+                        item_date = str(item.get("date") or "")[:10]
+                        if item_date and item_date != today_str:
+                            continue
+                    collected.append(item)
 
     return collected
 

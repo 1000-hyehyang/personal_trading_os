@@ -19,6 +19,7 @@ This module does not place trades and does not provide buy/sell recommendations.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -450,6 +451,8 @@ def _normalize_events(events_merged: dict[str, Any] | list[dict[str, Any]] | Non
     manual_event_high = False
     ticker_events: dict[str, list[str]] = {}
 
+    today = date.today()
+
     for event in all_events:
         event_type = str(event.get("type") or "").lower()
         name = str(event.get("name") or event.get("event") or "").lower()
@@ -457,23 +460,39 @@ def _normalize_events(events_merged: dict[str, Any] | list[dict[str, Any]] | Non
         risk_flag = str(event.get("risk_flag") or event.get("flag") or "").lower()
         ticker = str(event.get("ticker") or event.get("symbol") or "").upper().strip()
 
+        # Determine whether this event falls on today (or has no date — undated
+        # events are synthetic flags already filtered by add_event_risk_flags).
+        event_date_str = str(event.get("date") or "")[:10]
+        try:
+            event_date: date | None = date.fromisoformat(event_date_str) if event_date_str else None
+        except ValueError:
+            event_date = None
+        is_event_today = event_date is None or event_date == today
+
         is_high = impact == "high" or "high" in risk_flag
         is_macro = event_type in {"macro", "economic", "fomc"} or any(
             keyword in name
             for keyword in ["cpi", "ppi", "fomc", "pce", "gdp", "payroll", "employment"]
         )
 
-        if is_high and is_macro and (
+        # *_today flags: only activate when the event is actually dated today
+        if is_event_today and is_high and is_macro and (
             "today" in risk_flag
             or risk_flag in {"macro_high_today", "fomc_today", "fomc_minutes_today"}
             or not risk_flag
         ):
             high_impact_macro_today = True
 
-        if "fomc_today" in risk_flag or ("fomc" in name and "minutes" not in name and is_high):
+        if is_event_today and (
+            "fomc_today" in risk_flag
+            or ("fomc" in name and "minutes" not in name and is_high)
+        ):
             fomc_today = True
 
-        if "fomc_minutes_today" in risk_flag or ("fomc" in name and "minutes" in name):
+        if is_event_today and (
+            "fomc_minutes_today" in risk_flag
+            or ("fomc" in name and "minutes" in name)
+        ):
             fomc_minutes_today = True
 
         if "manual" in str(event.get("source") or "").lower() and is_high:

@@ -37,6 +37,7 @@ import json
 import logging
 import math
 import os
+import re
 import sys
 import traceback
 from dataclasses import asdict, dataclass, field
@@ -1142,24 +1143,41 @@ def fallback_calculate_indicators(prices: Any) -> dict[str, Any]:
         spy_rs_5d = compare_return(return_5d, pct_return(spy_closes, 5))
         qqq_rs_5d = compare_return(return_5d, pct_return(qqq_closes, 5))
 
+        above_20 = close > dma20 if dma20 else None
+        above_50 = close > dma50 if dma50 else None
+        above_200 = close > dma200 if dma200 else None
+
         result[ticker] = {
             "ticker": ticker,
             "date": valid_rows[-1].get("date"),
             "close": close,
             "prev_close": prev_close,
             "change_pct": change_pct,
+            # Canonical MA keys used by market_regime / packet_builder
+            "20DMA": dma20,
+            "50DMA": dma50,
+            "200DMA": dma200,
+            # Legacy aliases kept for backward-compat with existing tests
             "dma20": dma20,
             "dma50": dma50,
             "dma200": dma200,
             "volume": volumes[-1] if volumes else None,
             "volume_20d_avg": vol20,
-            "above_20dma": close > dma20 if dma20 else None,
-            "above_50dma": close > dma50 if dma50 else None,
-            "above_200dma": close > dma200 if dma200 else None,
+            # Canonical boolean keys (indicators.py style)
+            "close_above_20dma": above_20,
+            "close_above_50dma": above_50,
+            "close_above_200dma": above_200,
+            # Legacy boolean aliases
+            "above_20dma": above_20,
+            "above_50dma": above_50,
+            "above_200dma": above_200,
             "dma20_above_dma50": dma20 > dma50 if dma20 and dma50 else None,
             "volume_above_20d_avg": volumes[-1] > vol20 if volumes and vol20 else None,
             "near_20d_high": close >= high20 * 0.97 if high20 else None,
             "near_20d_low": close <= low20 * 1.03 if low20 else None,
+            # Canonical return key (indicators.py style)
+            "5D_return": return_5d,
+            # Legacy alias
             "return_5d": return_5d,
             "relative_strength_vs_spy_5d": spy_rs_5d,
             "relative_strength_vs_qqq_5d": qqq_rs_5d,
@@ -2370,6 +2388,32 @@ def build_packet_payload(state: PipelineState) -> dict[str, Any]:
     }
 
 
+def _extract_today_news_notes(text: str, target_date: str) -> str:
+    """
+    Extract only the target_date section from manual_news_notes.md.
+    Returns empty string if the section is not found.
+    Supports ## YYYY-MM-DD and ### YYYY-MM-DD headers.
+    """
+    if not text.strip():
+        return ""
+    lines = text.splitlines()
+    header_re = re.compile(r"^(#{2,6})\s+" + re.escape(target_date) + r"\s*$")
+    section_re = re.compile(r"^#{2,6}\s+\S+")
+    start: int | None = None
+    for idx, line in enumerate(lines):
+        if header_re.match(line.strip()):
+            start = idx + 1
+            break
+    if start is None:
+        return ""
+    collected: list[str] = []
+    for line in lines[start:]:
+        if section_re.match(line.strip()):
+            break
+        collected.append(line)
+    return "\n".join(collected).strip()
+
+
 def fallback_render_daily_packet(payload: dict[str, Any]) -> str:
     market = payload.get("market_regime", {})
     events = payload.get("events", {})
@@ -2400,10 +2444,12 @@ def fallback_render_daily_packet(payload: dict[str, Any]) -> str:
     lines.append(f"- Summary: {market.get('summary', '')}")
     lines.append("")
     lines.append("### Positive Evidence")
-    lines.extend(format_bullets(market.get("positive_evidence", [])))
+    positive = market.get("positive_reasons") or market.get("positive_evidence") or []
+    lines.extend(format_bullets(positive))
     lines.append("")
     lines.append("### Negative Evidence")
-    lines.extend(format_bullets(market.get("negative_evidence", [])))
+    negative = market.get("negative_reasons") or market.get("negative_evidence") or []
+    lines.extend(format_bullets(negative))
     lines.append("")
 
     lines.append("## 2. Event Risk")
@@ -2462,8 +2508,12 @@ def fallback_render_daily_packet(payload: dict[str, Any]) -> str:
 
     lines.append("")
     lines.append("## 7. Manual News Notes")
-    notes = str(payload.get("manual_news_notes") or "").strip()
-    lines.append(notes if notes else "- 수동 뉴스 메모 없음")
+    raw_notes = str(payload.get("manual_news_notes") or "").strip()
+    today_str = str(payload.get("date") or date.today().isoformat())[:10]
+    notes = _extract_today_news_notes(raw_notes, today_str)
+    if not notes:
+        notes = "- 오늘 수동 뉴스 메모 없음"
+    lines.append(notes)
     lines.append("")
 
     lines.append("## 8. Questions for GPT / Claude")
@@ -2725,16 +2775,27 @@ def fallback_render_telegram_summary(packet_payload: dict[str, Any]) -> str:
         "이벤트 리스크:",
     ]
 
+    _RISK_FLAG_KO = {
+        "macro_high_today": "오늘 고임팩트 매크로 이벤트",
+        "macro_high_next_24h": "24시간 내 고임팩트 매크로 이벤트",
+        "fomc_today": "FOMC 이벤트 당일",
+        "fomc_minutes_today": "FOMC Minutes 이벤트 당일",
+        "manual_event_high": "수동 등록 고임팩트 이벤트",
+        "earnings_today": "오늘 어닝 발표",
+        "earnings_tomorrow": "내일 어닝 발표",
+        "earnings_within_7d": "7일 내 어닝 발표",
+    }
     risk_flags = events.get("risk_flags", [])
     if risk_flags:
         for flag in risk_flags[:10]:
-            lines.append(f"- {flag}")
+            label = _RISK_FLAG_KO.get(str(flag), str(flag))
+            lines.append(f"- {label}")
     else:
         lines.append("- 없음")
 
     lines.append("")
     lines.append("오늘 금지:")
-    for idx, item in enumerate(risk.get("do_not_do_list", REQUIRED_DO_NOT_DO)[:5], start=1):
+    for idx, item in enumerate(risk.get("do_not_do_list", REQUIRED_DO_NOT_DO), start=1):
         lines.append(f"{idx}. {item}")
 
     lines.append("")
