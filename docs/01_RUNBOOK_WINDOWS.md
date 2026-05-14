@@ -1292,4 +1292,506 @@ open(path, "w", encoding="utf-8")
 15. Telegram으로 요약과 파일이 전송된다.
 16. Windows Task Scheduler에서 자동 실행된다.
 17. logs\post_close.log에 실행 로그가 남는다.
+18. logs\post_close_console.log에 BAT 래퍼 로그가 남는다.
+19. logs\pre_market.log에 pre-market 실행 로그가 남는다.
+20. logs\pre_market_console.log에 pre-market BAT 래퍼 로그가 남는다.
+```
+
+---
+
+## 21. Windows Task Scheduler 최종 운영 섹션
+
+> 기준: `00_PROJECT_SPEC.md`, `01_RUNBOOK_WINDOWS.md`, 현재 `run_post_close.bat`, `run_pre_market.bat`, `src\main.py` 구조
+> 상태: `phase12-review` 브랜치 / `C:\trading\personal_trading_os` / Python 3.12 / `.venv\Scripts\python.exe` 직접 호출
+
+---
+
+### 21.1 기준 상태
+
+```text
+Branch: phase12-review
+Project Path: C:\trading\personal_trading_os
+Python: 3.12
+Execution: .venv\Scripts\python.exe 직접 호출
+Scheduler: Windows Task Scheduler
+Shell: PowerShell 기준
+
+MVP 제외:
+- 자동매매 없음
+- TradingView scraping 없음
+- ChatGPT/OpenAI API 사용 없음
+- Claude API 사용 없음
+- 뉴스 자동 수집 없음
+```
+
+운영 파일:
+
+```text
+run_post_close.bat
+run_pre_market.bat
+src\main.py
+logs\
+output\
+cache\
+```
+
+주의:
+
+```text
+.env는 절대 공유하지 않는다.
+output\, logs\, cache\는 Git에 올리지 않는다.
+Task Scheduler에서는 venv activate를 사용하지 않는다.
+항상 .venv\Scripts\python.exe를 직접 호출한다.
+```
+
+---
+
+### 21.2 로그 파일 역할 분리
+
+`src\main.py`의 `setup_logging()`은 Python FileHandler와 StreamHandler를 동시에 등록한다.
+
+```text
+logs\post_close.log          Python FileHandler — Python 내부 실행 로그 (main.py 직접 기록)
+logs\post_close_console.log  BAT 리디렉션 — BAT 래퍼 메시지 + Python stdout 캡처
+
+logs\pre_market.log          Python FileHandler — Python 내부 실행 로그 (main.py 직접 기록)
+logs\pre_market_console.log  BAT 리디렉션 — BAT 래퍼 메시지 + Python stdout 캡처
+```
+
+두 파일 모두 동일한 Python 로그 내용을 담지만 역할이 다르다.
+
+- `*.log` → Python이 직접 기록. Task Scheduler 환경에서 실패해도 남는다.
+- `*_console.log` → BAT가 캡처. `Starting` / `Finished` / exit code 추적에 사용한다.
+
+---
+
+### 21.3 schtasks 등록 명령어
+
+#### Post-close 등록
+
+한국 시간 기준 화~토 오전 06:50 실행.
+
+```powershell
+schtasks /Create /TN "PersonalTradingOS_PostClose" /TR "C:\trading\personal_trading_os\run_post_close.bat" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 06:50 /F
+```
+
+#### Pre-market 등록 — 미국 서머타임 기간
+
+미국장이 한국 시간 22:30에 열리는 기간에는 21:00 KST 실행.
+
+```powershell
+schtasks /Create /TN "PersonalTradingOS_PreMarket" /TR "C:\trading\personal_trading_os\run_pre_market.bat" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 21:00 /F
+```
+
+#### Pre-market 등록 — 미국 표준시간 기간
+
+미국장이 한국 시간 23:30에 열리는 기간에는 22:00 KST 실행.
+
+```powershell
+schtasks /Create /TN "PersonalTradingOS_PreMarket" /TR "C:\trading\personal_trading_os\run_pre_market.bat" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 22:00 /F
+```
+
+주의:
+
+```text
+Windows Task Scheduler는 Windows 로컬 시간을 사용한다.
+미국 서머타임 전환 시 pre_market 작업 시간을 직접 조정한다.
+```
+
+---
+
+### 21.4 등록 확인 명령어
+
+```powershell
+schtasks /Query /TN "PersonalTradingOS_PostClose" /V /FO LIST
+schtasks /Query /TN "PersonalTradingOS_PreMarket" /V /FO LIST
+```
+
+확인 항목:
+
+```text
+TaskName
+Next Run Time
+Status
+Last Run Time
+Last Result
+Task To Run
+Schedule
+```
+
+정상적인 `Task To Run` 예시:
+
+```text
+C:\trading\personal_trading_os\run_post_close.bat
+C:\trading\personal_trading_os\run_pre_market.bat
+```
+
+---
+
+### 21.5 수동 실행 테스트 명령어
+
+#### 1단계 — Python 직접 실행
+
+```powershell
+Set-Location C:\trading\personal_trading_os
+
+.\.venv\Scripts\python.exe src\main.py --session post_close
+.\.venv\Scripts\python.exe src\main.py --session pre_market
+```
+
+#### 2단계 — BAT 직접 실행
+
+```powershell
+Set-Location C:\trading\personal_trading_os
+
+.\run_post_close.bat
+$LASTEXITCODE
+
+.\run_pre_market.bat
+$LASTEXITCODE
+```
+
+정상 종료: `0`
+
+#### 3단계 — Task Scheduler 즉시 실행
+
+```powershell
+schtasks /Run /TN "PersonalTradingOS_PostClose"
+schtasks /Run /TN "PersonalTradingOS_PreMarket"
+```
+
+주의:
+
+```text
+schtasks /Run은 작업을 시작했다는 뜻이지, 성공 완료를 의미하지 않는다.
+실제 성공 여부는 로그와 Last Result로 확인한다.
+```
+
+---
+
+### 21.6 출력 파일 확인 명령어
+
+```powershell
+Set-Location C:\trading\personal_trading_os
+
+Test-Path .\output\daily_packet.md
+Test-Path .\output\daily_packet.json
+Test-Path .\output\prompt_for_gpt.txt
+Test-Path .\output\prompt_for_claude.txt
+Test-Path .\output\telegram_summary.txt
+Test-Path .\output\events_auto.json
+Test-Path .\output\events_merged.json
+```
+
+최근 수정 시간 확인:
+
+```powershell
+Get-ChildItem .\output |
+  Select-Object Name, LastWriteTime, Length |
+  Sort-Object LastWriteTime -Descending
+```
+
+---
+
+### 21.7 로그 확인 명령어
+
+#### Post-close 로그
+
+```powershell
+Get-Content C:\trading\personal_trading_os\logs\post_close.log -Tail 200
+Get-Content C:\trading\personal_trading_os\logs\post_close_console.log -Tail 200
+```
+
+#### Pre-market 로그
+
+```powershell
+Get-Content C:\trading\personal_trading_os\logs\pre_market.log -Tail 200
+Get-Content C:\trading\personal_trading_os\logs\pre_market_console.log -Tail 200
+```
+
+#### 에러 검색
+
+```powershell
+Select-String -Path C:\trading\personal_trading_os\logs\*.log `
+  -Pattern "ERROR","Exception","Traceback","failed","Failed","FAIL","WARN"
+```
+
+#### 실행 시작/종료 흔적 검색
+
+```powershell
+Select-String -Path C:\trading\personal_trading_os\logs\*_console.log `
+  -Pattern "Starting","Finished","exit code"
+```
+
+---
+
+### 21.8 Task Scheduler 실패 시 확인 순서
+
+#### 1단계 — Last Result 확인
+
+```powershell
+schtasks /Query /TN "PersonalTradingOS_PostClose" /V /FO LIST
+```
+
+흔한 결과:
+
+```text
+0x0      정상
+0x1      일반 실행 실패
+0x2      파일/경로 문제 가능성
+0x41301  작업 실행 중
+```
+
+#### 2단계 — BAT 콘솔 로그 확인
+
+```powershell
+Get-Content C:\trading\personal_trading_os\logs\post_close_console.log -Tail 200
+```
+
+확인할 것:
+
+```text
+.venv\Scripts\python.exe not found
+src\main.py not found
+Finished ... with exit code 1
+Traceback
+ModuleNotFoundError
+```
+
+#### 3단계 — Python 내부 로그 확인
+
+```powershell
+Get-Content C:\trading\personal_trading_os\logs\post_close.log -Tail 200
+```
+
+확인할 것:
+
+```text
+config_load / price_collection / indicator_calculation / event_collection
+market_regime / watchlist_ranking / setup_matching / risk_engine
+output_generation / telegram_send
+Serious failures / Unhandled serious failure
+```
+
+#### 4단계 — output 생성 여부 확인
+
+```powershell
+Get-ChildItem C:\trading\personal_trading_os\output |
+  Select-Object Name, LastWriteTime, Length |
+  Sort-Object LastWriteTime -Descending
+```
+
+#### 5단계 — Python / BAT 직접 실행으로 재현
+
+```powershell
+Set-Location C:\trading\personal_trading_os
+.\.venv\Scripts\python.exe src\main.py --session post_close
+.\run_post_close.bat
+$LASTEXITCODE
+```
+
+#### 6단계 — Task Scheduler Operational 로그 확인
+
+```powershell
+Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational -MaxEvents 100 |
+  Where-Object { $_.Message -like "*PersonalTradingOS*" } |
+  Select-Object TimeCreated, Id, LevelDisplayName, Message |
+  Format-List
+```
+
+---
+
+### 21.9 수동 실행은 성공하지만 Task Scheduler만 실패할 때
+
+```text
+1. Task Scheduler가 다른 사용자 계정으로 실행됨
+2. 권한 문제
+3. .env가 프로젝트 루트에 없거나 읽히지 않음
+4. 네트워크가 작업 실행 시점에 준비되지 않음
+5. 절전/전원 상태 문제
+```
+
+현재 BAT 파일은 `cd /d C:\trading\personal_trading_os`를 포함하므로 working directory 문제는 방지된다.
+
+#### .env 존재 및 설정 확인 (값 노출 없이)
+
+```powershell
+Test-Path C:\trading\personal_trading_os\.env
+
+Get-Content C:\trading\personal_trading_os\.env | ForEach-Object {
+    if ($_ -match '^(?<key>[^=]+)=(?<value>.*)$') {
+        if ($matches.value.Length -gt 0) {
+            "$($matches.key)=<set>"
+        } else {
+            "$($matches.key)=<empty>"
+        }
+    }
+}
+```
+
+#### 가상환경 및 패키지 확인
+
+```powershell
+Test-Path C:\trading\personal_trading_os\.venv\Scripts\python.exe
+
+C:\trading\personal_trading_os\.venv\Scripts\python.exe --version
+
+C:\trading\personal_trading_os\.venv\Scripts\python.exe -c "import pandas, yfinance, yaml, dotenv, requests; print('OK')"
+```
+
+#### Task Scheduler GUI 확인 항목
+
+```text
+Task Scheduler → Task Scheduler Library → PersonalTradingOS_PostClose → Properties
+
+General:
+- Run only when user is logged on 권장
+- Configure for: Windows 10 또는 Windows 11
+
+Actions:
+- Program/script: C:\trading\personal_trading_os\run_post_close.bat
+
+Conditions:
+- Start the task only if the computer is on AC power → 필요 시 해제
+- Wake the computer to run this task → 필요 시 체크
+
+Settings:
+- Allow task to be run on demand 체크
+```
+
+---
+
+### 21.10 작업 삭제/재등록 명령어
+
+```powershell
+# 삭제
+schtasks /Delete /TN "PersonalTradingOS_PostClose" /F
+schtasks /Delete /TN "PersonalTradingOS_PreMarket" /F
+
+# Post-close 재등록
+schtasks /Create /TN "PersonalTradingOS_PostClose" /TR "C:\trading\personal_trading_os\run_post_close.bat" /SC WEEKLY /D TUE,WED,THU,FRI,SAT /ST 06:50 /F
+
+# Pre-market 재등록 (서머타임)
+schtasks /Create /TN "PersonalTradingOS_PreMarket" /TR "C:\trading\personal_trading_os\run_pre_market.bat" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 21:00 /F
+
+# Pre-market 재등록 (표준시간)
+schtasks /Create /TN "PersonalTradingOS_PreMarket" /TR "C:\trading\personal_trading_os\run_pre_market.bat" /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 22:00 /F
+
+# 재등록 확인
+schtasks /Query /TN "PersonalTradingOS_PostClose" /V /FO LIST
+schtasks /Query /TN "PersonalTradingOS_PreMarket" /V /FO LIST
+```
+
+---
+
+### 21.11 Windows 시간대 확인
+
+Task Scheduler는 Windows 로컬 시간 기준으로 실행된다.
+
+```powershell
+Get-TimeZone
+tzutil /g
+Get-Date
+```
+
+정상 예시:
+
+```text
+Korea Standard Time
+```
+
+시간대가 다르면 관리자 PowerShell에서 변경한다.
+
+```powershell
+tzutil /s "Korea Standard Time"
+```
+
+---
+
+### 21.12 최종 운영 체크리스트
+
+#### 최초 등록 전
+
+```text
+[ ] C:\trading\personal_trading_os 경로 확인
+[ ] .venv\Scripts\python.exe 존재 확인
+[ ] requirements 설치 확인
+[ ] .env 존재 확인 (값은 <set>/<empty>로만 확인)
+[ ] config 파일 존재 확인
+[ ] data\manual_news_notes.md 존재 확인
+[ ] run_post_close.bat 확인
+[ ] run_pre_market.bat 확인
+[ ] output/, logs/, cache/가 .gitignore에 포함되어 있는지 확인
+```
+
+#### 수동 테스트
+
+```text
+[ ] Python 직접 실행 post_close 성공
+[ ] Python 직접 실행 pre_market 성공
+[ ] run_post_close.bat 성공 ($LASTEXITCODE = 0)
+[ ] run_pre_market.bat 성공 ($LASTEXITCODE = 0)
+[ ] output 필수 파일 생성 확인
+[ ] logs\post_close.log 확인
+[ ] logs\post_close_console.log 확인
+[ ] logs\pre_market.log 확인
+[ ] logs\pre_market_console.log 확인
+```
+
+#### Task Scheduler 등록 후
+
+```text
+[ ] PersonalTradingOS_PostClose 등록 확인
+[ ] PersonalTradingOS_PreMarket 등록 확인
+[ ] schtasks /Run으로 즉시 실행 확인
+[ ] Last Result 0x0 확인
+[ ] Task Scheduler Operational 로그 확인
+[ ] Telegram 수신 확인
+```
+
+#### 운영 중 문제 발생 시
+
+```text
+[ ] schtasks /Query로 Last Result 확인
+[ ] *_console.log 확인
+[ ] Python 내부 *.log 확인
+[ ] output 파일 생성 시간 확인
+[ ] Python 직접 실행으로 재현
+[ ] BAT 직접 실행으로 재현
+[ ] Task Scheduler Operational 로그 확인
+[ ] 필요 시 작업 삭제 후 재등록
+```
+
+---
+
+### 21.13 최종 운영 구성
+
+```text
+Post-close:
+  Task Name : PersonalTradingOS_PostClose
+  Schedule  : 화~토 06:50 KST
+  BAT       : run_post_close.bat
+  Session   : post_close
+  Python log: logs\post_close.log
+  Console log: logs\post_close_console.log
+
+Pre-market:
+  Task Name : PersonalTradingOS_PreMarket
+  Schedule  : 서머타임 월~금 21:00 KST / 표준시간 월~금 22:00 KST
+  BAT       : run_pre_market.bat
+  Session   : pre_market
+  Python log: logs\pre_market.log
+  Console log: logs\pre_market_console.log
+```
+
+아래 순서가 모두 통과하면 Windows Task Scheduler 운영 단계 완료:
+
+```text
+1. Python 직접 실행 성공
+2. BAT 직접 실행 성공
+3. schtasks /Run 성공
+4. 정시 자동 실행 성공
+5. output 필수 파일 생성 확인
+6. logs 파일 생성 확인
+7. Telegram 수신 확인
 ```
